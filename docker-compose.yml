@@ -1,0 +1,8 @@
+version: '3'
+services:
+  ocart:
+    build: .
+    ports:
+      - "8000:80"
+      - "8022:22"
+    container_name: ocart

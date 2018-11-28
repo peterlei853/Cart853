@@ -1,0 +1,4 @@
+host sntong.synology.me
+ HostName sntong.synology.me
+ IdentityFile ~/.ssh/pos-deploy.pem
+ User git
