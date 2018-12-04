@@ -1,8 +1,8 @@
 <?php
 // HTTP
-define('HTTP_SERVER', 'http://diskstation:8000/');
+define('HTTP_SERVER', 'http://sntong.synology.me/');
 // HTTPS
-define('HTTPS_SERVER', 'http://diskstation:8000/');
+define('HTTPS_SERVER', 'http://sntong.synology.me/');
 // DIR
 define('DIR_APPLICATION', '/app/catalog/');
 define('DIR_SYSTEM', '/app/system/');

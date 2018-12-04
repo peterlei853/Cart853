@@ -1,10 +1,10 @@
 <?php
 // HTTP
-define('HTTP_SERVER', 'http://diskstation:8000/admin/');
-define('HTTP_CATALOG', 'http://diskstation:8000/');
+define('HTTP_SERVER', 'http://sntong.synology.me/admin/');
+define('HTTP_CATALOG', 'http://sntong.synology.me/');
 // HTTPS
-define('HTTPS_SERVER', 'http://diskstation:8000/admin/');
-define('HTTPS_CATALOG', 'http://diskstation:8000/');
+define('HTTPS_SERVER', 'http://sntong.synology.me/admin/');
+define('HTTPS_CATALOG', 'http://sntong.synology.me/');
 // DIR
 define('DIR_APPLICATION', '/app/admin/');
 define('DIR_SYSTEM', '/app/system/');

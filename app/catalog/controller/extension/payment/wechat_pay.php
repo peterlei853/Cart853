@@ -6,6 +6,7 @@
  * @license		https://opensource.org/licenses/GPL-3.0
  * @link		https://www.opencart.cn
  */
+use Wechat\Lib\Tools;
 
 class ControllerExtensionPaymentWechatPay extends Controller {
 	public function index() {
@@ -14,6 +15,116 @@ class ControllerExtensionPaymentWechatPay extends Controller {
 		$data['redirect'] = $this->url->link('extension/payment/wechat_pay/qrcode');
 
 		return $this->load->view('extension/payment/wechat_pay', $data);
+	}
+
+    /**
+     * 生成支付签名
+     * @param array $option
+     * @param string $partnerKey
+     * @return string
+     */
+    static public function getPaySign($option, $partnerKey) {
+        ksort($option);
+        $buff = '';
+        foreach ($option as $k => $v) {
+            $buff .= "{$k}={$v}&";
+        }
+        //echo "{$buff}key={$partnerKey}";
+        //echo "KEY RAW!!!!";
+        return strtoupper(md5("{$buff}key={$partnerKey}"));
+	}
+	
+    static public function httpPost($url, $data_string) {
+        $ch = curl_init($url);                                                                      
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);                                                                  
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(                                                                          
+            'Content-Type: application/json',                                                                                
+            'Content-Length: ' . strlen($data_string))                                                                       
+        );                                                                                                                   
+        $result = curl_exec($ch);                                                                   
+        curl_close($ch);
+        if ($result) {
+            return $result;
+        }
+        return false;
+	}
+	
+	public function getOpenID($appid, $secret, $code) {
+		$url = "https://api.weixin.qq.com/sns/oauth2/access_token" . "?appid={$appid}&secret={$secret}&code={$code}" . "&grant_type=authorization_code";
+		$result = Tools::httpGet($url);
+        if ($result) {
+            $json = json_decode($result, true);
+            if (!$json || !empty($json['errcode'])) {
+                $this->errCode = $json['errcode'];
+                $this->errMsg = $json['errmsg'];
+                Tools::log("WechatOauth::getOauthAuth Fail.{$this->errMsg} [{$this->errCode}]", 'ERR');
+                return false;
+            } else if ($json['errcode'] == 0) {
+                return $json["openid"];
+            }
+        }
+        return false;
+	}
+
+	public function uePay(){
+		//https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxe247769eb88def6e&redirect_uri=http%3A%2F%2Fsntong.synology.me&response_type=code&scope=snsapi_base&state=STATE#wechat_redirect
+
+		$uePayUrl = 'http://183.6.50.156:14031/weChatPay/entry.do';
+
+		$key = $this->config->get('payment_wechat_pay_api_secret');
+		$key = '3315C66DF6265C47BC1';
+
+		echo $key;
+		$postData = array(
+			'arguments'         => array("orderNo"=>"20180214143250"),
+			'appSource'			=>  "1",
+			'appVersion'		=>  "1.2",
+			'requestType'		=>  "JSAPI",
+			'merchantNo'		=>  $this->config->get('payment_wechat_pay_app_id'),
+		);
+
+		$keyOption = array_merge($postData, $postData["arguments"]);
+		unset($keyOption["arguments"]);
+		var_dump($keyOption);
+		echo 'postData';
+		$postData['clientSign'] = self::getPaySign($keyOption, $key);
+		var_dump($postData);
+
+		$postJson = Tools::json_encode($postData);
+		var_dump($postJson);
+		#echo 'POST!!';
+		#$uePayResult = self::httpPost($uePayUrl, $postJson);
+		#echo 'RESULT!!';
+		#var_dump($uePayResult);
+		echo 'getPrepayId!!';
+		$result = $pay->getPrepayId(NULL, $subject, $order_id,  1, $notify_url, $trade_type = "JSAPI", NULL);
+		var_dump($result);
+		//$result = $pay->getPrepayId(NULL, $subject, $order_id, $total_amount * 100, $notify_url, $trade_type = "NATIVE", NULL, $currency);
+
+	}
+	
+	public function test() {
+		//$options = array(
+		//	'appid'			 =>  'wxe247769eb88def6e',
+		//	'appsecret'		 =>  '3315c66df6265c47bc1bce401e9c08c9'
+		//);
+
+		$options = array(
+			'appid'			 =>  'wx8419eb47c3415f1a',
+			'appsecret'		 =>  '44481f03441c07062e30b275a63919b2'
+		);
+
+		$json = array();
+		$json['result'] = true;
+		if (isset($this->request->get['code'])){
+			$code = $this->request->get['code'];
+			$json['code'] = $code;
+			$json['openid'] = $this->getOpenID($options['appid'], $options['appsecret'], $code);
+		}
+
+		$this->response->setOutput(json_encode($json));
 	}
 
 	public function qrcode() {
