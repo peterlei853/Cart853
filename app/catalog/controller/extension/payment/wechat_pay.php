@@ -58,7 +58,8 @@ class ControllerExtensionPaymentWechatPay extends Controller {
             $json = json_decode($result, true);
             if (!$json || !empty($json['errcode'])) {
                 $this->errCode = $json['errcode'];
-                $this->errMsg = $json['errmsg'];
+				$this->errMsg = $json['errmsg'];
+				echo $result;
                 Tools::log("WechatOauth::getOauthAuth Fail.{$this->errMsg} [{$this->errCode}]", 'ERR');
                 return false;
             } else if ($json['errcode'] == 0) {
@@ -68,53 +69,86 @@ class ControllerExtensionPaymentWechatPay extends Controller {
         return false;
 	}
 
-	public function uePay(){
-		//https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxe247769eb88def6e&redirect_uri=http%3A%2F%2Fsntong.synology.me&response_type=code&scope=snsapi_base&state=STATE#wechat_redirect
-
-		$uePayUrl = 'http://183.6.50.156:14031/weChatPay/entry.do';
-
-		$key = $this->config->get('payment_wechat_pay_api_secret');
-		$key = '3315C66DF6265C47BC1';
-
-		echo $key;
-		$postData = array(
-			'arguments'         => array("orderNo"=>"20180214143250"),
-			'appSource'			=>  "1",
-			'appVersion'		=>  "1.2",
-			'requestType'		=>  "JSAPI",
-			'merchantNo'		=>  $this->config->get('payment_wechat_pay_app_id'),
-		);
-
+	private function getClientSign($postData, $key){
 		$keyOption = array_merge($postData, $postData["arguments"]);
 		unset($keyOption["arguments"]);
-		var_dump($keyOption);
-		echo 'postData';
-		$postData['clientSign'] = self::getPaySign($keyOption, $key);
-		var_dump($postData);
+		//var_dump($keyOption);
+		return self::getPaySign($keyOption, $key);
+	}
 
+	public function genOrderNo(){
+		return date("YmdHis");
+	}
+
+	public function uePost($requestType, $arguments){
+		//$uePayUrl = 'http://183.6.50.156:14031/weChatPay/entry.do';
+		//$ueMerchantNo = '000030053310001';
+		//$ueKey = '3315C66DF6265C47BC1BCE401E9C08C9';
+		$uePayUrl = 'https://openapi.uepay.mo/weChatPay/entry.do';
+		$ueMerchantNo = '001020453997690';
+		$ueKey = '109ef195631ffee72eae389e3b501574';
+		
+		$postData = array(
+			'arguments'         =>  $arguments,
+			'appSource'			=>  "1",
+			'appVersion'		=>  "1.2",
+			'requestType'		=>  $requestType,
+			'merchantNo'		=>  $ueMerchantNo,
+		);
+		$postData['clientSign'] = $this->getClientSign($postData, $ueKey);
+		//var_dump($postData);
 		$postJson = Tools::json_encode($postData);
 		var_dump($postJson);
 		#echo 'POST!!';
-		#$uePayResult = self::httpPost($uePayUrl, $postJson);
-		#echo 'RESULT!!';
-		#var_dump($uePayResult);
-		echo 'getPrepayId!!';
-		$result = $pay->getPrepayId(NULL, $subject, $order_id,  1, $notify_url, $trade_type = "JSAPI", NULL);
-		var_dump($result);
-		//$result = $pay->getPrepayId(NULL, $subject, $order_id, $total_amount * 100, $notify_url, $trade_type = "NATIVE", NULL, $currency);
+		$uePayResult = self::httpPost($uePayUrl, $postJson);
+		echo 'RESULT!!';
+		echo $uePayResult;
+	}
+
+	public function ueQuery(){
+		$arguments = array(
+			'orderNo' => '20181205143252'
+		);
+		return $this->uePost('QUERY', $arguments);
+	}
+
+	public function uePay($openid, $amt){
+		//20181205143250
+		$arguments = array(
+			'orderNo' => '20181205143252',
+			'body' => 'Test Good',
+			'amt' => strval($amt * 100),
+			"payMethod" => "wx",
+			'openid' => $openid,
+			'attach' => 'test'
+		);
+		$reuslt = $this->uePost('JSAPI', $arguments);
+
+		if ($result) {
+			$json = json_decode($result, true);
+			if (!$json || $json['result'] !== 'true' ) {
+				echo $result;
+                return false;
+            } else if ($json['result'] == 'true') {
+				$results = $json['results'];
+
+
+                return $json["openid"];
+            }
+		}
 
 	}
 	
 	public function test() {
-		//$options = array(
-		//	'appid'			 =>  'wxe247769eb88def6e',
-		//	'appsecret'		 =>  '3315c66df6265c47bc1bce401e9c08c9'
-		//);
-
 		$options = array(
-			'appid'			 =>  'wx8419eb47c3415f1a',
-			'appsecret'		 =>  '44481f03441c07062e30b275a63919b2'
-		);
+			'appid'			 =>  'wxe247769eb88def6e',
+			'appsecret'		 =>  'a8c5677da0d1e0c48f4b84b693863bfb'
+		); //sandbox , production is same
+
+		//$options = array(
+		//	'appid'			 =>  'wx8419eb47c3415f1a',
+		//	'appsecret'		 =>  '44481f03441c07062e30b275a63919b2'
+		//); //test
 
 		$json = array();
 		$json['result'] = true;
@@ -122,9 +156,20 @@ class ControllerExtensionPaymentWechatPay extends Controller {
 			$code = $this->request->get['code'];
 			$json['code'] = $code;
 			$json['openid'] = $this->getOpenID($options['appid'], $options['appsecret'], $code);
+
+			if ($json['openid']){
+				$amt = 0.01;
+				//$this->ueQuery();
+				//$this->uePay($json['openid'], $amt);
+			}
 		}
 
-		$this->response->setOutput(json_encode($json));
+		$data = array(
+			'debug' => json_encode($json),
+			'appId' => '123'
+		);
+
+		$this->response->setOutput($this->load->view('extension/payment/ue_pay', $data));
 	}
 
 	public function qrcode() {
