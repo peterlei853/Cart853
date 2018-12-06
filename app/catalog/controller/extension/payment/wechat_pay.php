@@ -96,47 +96,42 @@ class ControllerExtensionPaymentWechatPay extends Controller {
 			'merchantNo'		=>  $ueMerchantNo,
 		);
 		$postData['clientSign'] = $this->getClientSign($postData, $ueKey);
-		//var_dump($postData);
 		$postJson = Tools::json_encode($postData);
 		var_dump($postJson);
-		#echo 'POST!!';
 		$uePayResult = self::httpPost($uePayUrl, $postJson);
-		echo 'RESULT!!';
-		echo $uePayResult;
+		return $uePayResult;
 	}
 
 	public function ueQuery(){
 		$arguments = array(
-			'orderNo' => '20181205143252'
+			'orderNo' => '20181205143303'
 		);
 		return $this->uePost('QUERY', $arguments);
 	}
 
-	public function uePay($openid, $amt){
+	public function uePrePay($openid, $amt){
 		//20181205143250
 		$arguments = array(
-			'orderNo' => '20181205143252',
+			'orderNo' => '20181205143303',
 			'body' => 'Test Good',
 			'amt' => strval($amt * 100),
 			"payMethod" => "wx",
 			'openid' => $openid,
 			'attach' => 'test'
 		);
-		$reuslt = $this->uePost('JSAPI', $arguments);
-
+		$result = $this->uePost('JSAPI', $arguments);
 		if ($result) {
 			$json = json_decode($result, true);
-			if (!$json || $json['result'] !== 'true' ) {
+			if (!$json || $json['result'] !== 'true') {
+				echo 'ERROR!!';
 				echo $result;
                 return false;
             } else if ($json['result'] == 'true') {
-				$results = $json['results'];
-
-
-                return $json["openid"];
+				echo 'GOOD!!';
+                return $json['results'];
             }
 		}
-
+		return false;
 	}
 	
 	public function test() {
@@ -160,7 +155,13 @@ class ControllerExtensionPaymentWechatPay extends Controller {
 			if ($json['openid']){
 				$amt = 0.01;
 				//$this->ueQuery();
-				//$this->uePay($json['openid'], $amt);
+				$data = $this->uePrePay($json['openid'], $amt);
+				if($data){
+					echo 'GOOD2';
+					$data['debug'] = json_encode($data);
+					var_dump($data);
+					return $this->response->setOutput($this->load->view('extension/payment/ue_pay', $data));
+				}
 			}
 		}
 
@@ -168,8 +169,8 @@ class ControllerExtensionPaymentWechatPay extends Controller {
 			'debug' => json_encode($json),
 			'appId' => '123'
 		);
-
-		$this->response->setOutput($this->load->view('extension/payment/ue_pay', $data));
+		$this->response->setOutput(json_encode($json));
+		
 	}
 
 	public function qrcode() {
