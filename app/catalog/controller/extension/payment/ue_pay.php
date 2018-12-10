@@ -8,7 +8,7 @@
  */
 use Wechat\Lib\Tools;
 
-class ControllerExtensionPaymentWechatPay extends Controller {
+class ControllerExtensionPaymentUePay extends Controller {
 	public function index() {
 		$data['button_confirm'] = $this->language->get('button_confirm');
 
