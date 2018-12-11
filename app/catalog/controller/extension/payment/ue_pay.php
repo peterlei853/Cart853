@@ -133,6 +133,10 @@ class ControllerExtensionPaymentUePay extends Controller {
 		}
 		return false;
 	}
+
+	public function payConfirm(){
+		//TODO, reference test();
+	}
 	
 	public function test() {
 		$options = array(
