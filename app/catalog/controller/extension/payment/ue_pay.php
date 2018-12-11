@@ -12,9 +12,9 @@ class ControllerExtensionPaymentUePay extends Controller {
 	public function index() {
 		$data['button_confirm'] = $this->language->get('button_confirm');
 
-		$data['redirect'] = $this->url->link('extension/payment/wechat_pay/qrcode');
+		$data['redirect'] = $this->url->link('extension/payment/ue_pay/qrcode');
 
-		return $this->load->view('extension/payment/wechat_pay', $data);
+		return $this->load->view('extension/payment/ue_pay', $data);
 	}
 
     /**
@@ -175,7 +175,7 @@ class ControllerExtensionPaymentUePay extends Controller {
 
 	public function qrcode() {
 
-		$this->load->language('extension/payment/wechat_pay');
+		$this->load->language('extension/payment/ue_pay');
 
 		$this->document->setTitle($this->language->get('heading_title'));
 		$this->document->addScript('catalog/view/javascript/qrcode.js');
@@ -194,39 +194,28 @@ class ControllerExtensionPaymentUePay extends Controller {
 
 		$data['breadcrumbs'][] = array(
 			'text' => $this->language->get('text_qrcode'),
-			'href' => $this->url->link('extension/payment/wechat_pay/qrcode')
+			'href' => $this->url->link('extension/payment/ue_pay/qrcode')
 		);
 
 		$this->load->model('checkout/order');
 
 		$order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
-		//echo 'testing1';
 		$order_id = trim($order_info['order_id']);
 		$data['order_id'] = $order_id;
 		$subject = trim($this->config->get('config_name'));
-		$currency = $this->config->get('payment_wechat_pay_currency');
+		$currency = $this->config->get('payment_ue_pay_currency');
 		$total_amount = trim($this->currency->format($order_info['total'], $currency, '', false));
-		$notify_url = HTTPS_SERVER . "payment_callback/wechat_pay"; //$this->url->link('wechat_pay/callback');
-		//echo 'testing2';
 		$options = array(
-			'appid'			 =>  $this->config->get('payment_wechat_pay_app_id'),
-			'appsecret'		 =>  $this->config->get('payment_wechat_pay_app_secret'),
-			'mch_id'			=>  $this->config->get('payment_wechat_pay_mch_id'),
-			'partnerkey'		=>  $this->config->get('payment_wechat_pay_api_secret')
+			'appid'			 =>  $this->config->get('payment_ue_pay_app_id'),
+			'appsecret'		 =>  $this->config->get('payment_ue_pay_app_secret'),
+			'mch_id'			=>  $this->config->get('payment_ue_pay_mch_id'),
+			'partnerkey'		=>  $this->config->get('payment_ue_pay_api_secret')
 		);
 
 		\Wechat\Loader::config($options);
 		$pay = new \Wechat\WechatPay();
-
-		$result = $pay->getPrepayId(NULL, $subject, $order_id, $total_amount * 100, $notify_url, $trade_type = "NATIVE", NULL, $currency);
-
-		$data['error'] = '';
-		$data['code_url'] = '';
-		if($result === FALSE){
-			$data['error_warning'] = $pay->errMsg;
-		} else {
-			$data['code_url'] = $result;
-		}
+		
+		$data['code_url'] = "index.php?route=extension/payment/ue_pay/pay&order_id=" . $order_id; //TODO
 
 		$data['action_success'] = $this->url->link('checkout/success');
 
@@ -237,7 +226,7 @@ class ControllerExtensionPaymentUePay extends Controller {
 		$data['footer'] = $this->load->controller('common/footer');
 		$data['header'] = $this->load->controller('common/header');
 
-		$this->response->setOutput($this->load->view('extension/payment/wechat_pay_qrcode', $data));
+		$this->response->setOutput($this->load->view('extension/payment/ue_pay_qrcode', $data));
 	}
 
 	public function isOrderPaid() {
@@ -251,7 +240,7 @@ class ControllerExtensionPaymentUePay extends Controller {
 			$this->load->model('checkout/order');
 			$order_info = $this->model_checkout_order->getOrder($order_id);
 
-			if ($order_info['order_status_id'] == $this->config->get('payment_wechat_pay_completed_status_id')) {
+			if ($order_info['order_status_id'] == $this->config->get('payment_ue_pay_completed_status_id')) {
 				$json['result'] = true;
 			}
 		}
@@ -262,10 +251,10 @@ class ControllerExtensionPaymentUePay extends Controller {
 
 	public function callback() {
 		$options = array(
-			'appid'			 =>  $this->config->get('payment_wechat_pay_app_id'),
-			'appsecret'		 =>  $this->config->get('payment_wechat_pay_app_secret'),
-			'mch_id'			=>  $this->config->get('payment_wechat_pay_mch_id'),
-			'partnerkey'		=>  $this->config->get('payment_wechat_pay_api_secret')
+			'appid'			 =>  $this->config->get('payment_ue_pay_app_id'),
+			'appsecret'		 =>  $this->config->get('payment_ue_pay_app_secret'),
+			'mch_id'			=>  $this->config->get('payment_ue_pay_mch_id'),
+			'partnerkey'		=>  $this->config->get('payment_ue_pay_api_secret')
 		);
 
 		\Wechat\Loader::config($options);
@@ -282,7 +271,7 @@ class ControllerExtensionPaymentUePay extends Controller {
 				if ($order_info) {
 					$order_status_id = $order_info["order_status_id"];
 					if (!$order_status_id) {
-						$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('payment_wechat_pay_completed_status_id'));
+						$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('payment_ue_pay_completed_status_id'));
 					}
 				}
 				return xml(['return_code' => 'SUCCESS', 'return_msg' => 'DEAL WITH SUCCESS']);
