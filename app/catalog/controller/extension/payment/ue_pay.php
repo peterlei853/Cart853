@@ -51,28 +51,19 @@ class ControllerExtensionPaymentUePay extends Controller {
         return false;
 	}
 	
-	public function getOpenID($appid, $secret, $code) {
-		$url = "https://api.weixin.qq.com/sns/oauth2/access_token" . "?appid={$appid}&secret={$secret}&code={$code}" . "&grant_type=authorization_code";
-		$result = Tools::httpGet($url);
-        if ($result) {
-            $json = json_decode($result, true);
-            if (!$json || !empty($json['errcode'])) {
-                $this->errCode = $json['errcode'];
-				$this->errMsg = $json['errmsg'];
-				echo $result;
-                Tools::log("WechatOauth::getOauthAuth Fail.{$this->errMsg} [{$this->errCode}]", 'ERR');
-                return false;
-            } else if ($json['errcode'] == 0) {
-                return $json["openid"];
-            }
-        }
-        return false;
+	public function getOpenID($appid, $secret) {
+		$weOAuth = new \Wechat\WechatOauth(array('appid'=>$appid, 'appsecret'=>$secret));
+		$result =  $weOAuth->getOauthAccessToken();
+		if ($result) {
+			return $result["openid"];
+		}else{
+			return false;
+		}
 	}
 
 	private function getClientSign($postData, $key){
 		$keyOption = array_merge($postData, $postData["arguments"]);
 		unset($keyOption["arguments"]);
-		//var_dump($keyOption);
 		return self::getPaySign($keyOption, $key);
 	}
 
@@ -80,13 +71,10 @@ class ControllerExtensionPaymentUePay extends Controller {
 		return date("YmdHis");
 	}
 
-	public function uePost($requestType, $arguments){
-		//$uePayUrl = 'http://183.6.50.156:14031/weChatPay/entry.do';
-		//$ueMerchantNo = '000030053310001';
-		//$ueKey = '3315C66DF6265C47BC1BCE401E9C08C9';
-		$uePayUrl = 'https://openapi.uepay.mo/weChatPay/entry.do';
-		$ueMerchantNo = '001020453997690';
-		$ueKey = '109ef195631ffee72eae389e3b501574';
+	public function uePost($requestType, $arguments, $options){
+		$uePayUrl = $options['api_url']; //'https://openapi.uepay.mo/weChatPay/entry.do'
+		$ueMerchantNo = $options['mch_id']; //'001020453997690'
+		$ueKey = $options['api_secret']; //'109ef195631ffee72eae389e3b501574'
 		
 		$postData = array(
 			'arguments'         =>  $arguments,
@@ -95,87 +83,93 @@ class ControllerExtensionPaymentUePay extends Controller {
 			'requestType'		=>  $requestType,
 			'merchantNo'		=>  $ueMerchantNo,
 		);
+
 		$postData['clientSign'] = $this->getClientSign($postData, $ueKey);
 		$postJson = Tools::json_encode($postData);
-		var_dump($postJson);
 		$uePayResult = self::httpPost($uePayUrl, $postJson);
 		return $uePayResult;
 	}
 
-	public function ueQuery(){
+	public function ueQuery($orderNo){
 		$arguments = array(
-			'orderNo' => '20181205143305'
+			'orderNo' => $orderNo
 		);
 		return $this->uePost('QUERY', $arguments);
 	}
 
-	public function uePrePay($openid, $amt){
-		//20181205143250
+
+	private function ueRequestPay($order_id, $open_id, $options){
+		$this->load->model('checkout/order');
+		$order_info = $this->model_checkout_order->getOrder($order_id);
+		$subject = trim($this->config->get('config_name'));
+		$currency = $this->config->get('payment_ue_pay_currency');
+		$total_amount = trim($this->currency->format($order_info['total'], $currency, '', false));
+		
+		$order_id = 'T201812190' . $order_id; //FORTEST ONLY
+
 		$arguments = array(
-			'orderNo' => '20181205143305',
-			'body' => 'Test Good',
-			'amt' => strval($amt * 100),
+			'orderNo' => '' . $order_id,
+			'body' => '' . $order_id,
+			'amt' => strval($total_amount * 100),
 			"payMethod" => "wx",
-			'openid' => $openid,
-			'attach' => 'test'
+			'openid' => $open_id
 		);
-		$result = $this->uePost('JSAPI', $arguments);
+
+		$result = $this->uePost('JSAPI', $arguments, $options);
+		
 		if ($result) {
 			$json = json_decode($result, true);
 			if (!$json || $json['result'] !== 'true') {
-				echo 'ERROR!!';
-				echo $result;
+				var_dump($json); 
+				if ($json["retCode"] == "4002"){
+					echo 'duplicate order no'; //TODO handle duplicate, cancel the order.
+				}
                 return false;
             } else if ($json['result'] == 'true') {
-				echo 'GOOD!!';
                 return $json['results'];
             }
+		}else{
+			return false;
 		}
-		return false;
 	}
 
-	public function payConfirm(){
-		//TODO, reference test();
-	}
-	
-	public function test() {
-		$options = array(
-			'appid'			 =>  'wxe247769eb88def6e',
-			'appsecret'		 =>  'a8c5677da0d1e0c48f4b84b693863bfb'
-		); //sandbox , production is same
+	public function pay(){
+		if (isset($this->request->get['order_id']) && isset($this->request->get['code'])) {
+			$order_id = trim($this->request->get['order_id']);
+			$options = array(
+				'appid'			 =>  $this->config->get('payment_ue_pay_app_id'),
+				'appsecret'		 =>  $this->config->get('payment_ue_pay_app_secret'),
+				'mch_id'			=>  $this->config->get('payment_ue_pay_mch_id'),
+				'api_secret'		=>  $this->config->get('payment_ue_pay_api_secret'),
+				'api_url'		=>  $this->config->get('payment_ue_pay_api_url')
+			);
 
-		//$options = array(
-		//	'appid'			 =>  'wx8419eb47c3415f1a',
-		//	'appsecret'		 =>  '44481f03441c07062e30b275a63919b2'
-		//); //test
+			$open_id = $this->getOpenID($options['appid'], $options['appsecret']);
 
-		$json = array();
-		$json['result'] = true;
-		if (isset($this->request->get['code'])){
-			$code = $this->request->get['code'];
-			$json['code'] = $code;
-			$json['openid'] = $this->getOpenID($options['appid'], $options['appsecret'], $code);
-
-			if ($json['openid']){
-				$amt = 0.01;
-				//$this->ueQuery();
-				$data = $this->uePrePay($json['openid'], $amt);
+			if ($open_id) {
+				$data = $this->ueRequestPay($order_id, $open_id, $options);
 				if($data){
-					echo 'GOOD2';
 					$data['debug'] = json_encode($data);
-					var_dump($data);
 					return $this->response->setOutput($this->load->view('extension/payment/ue_pay', $data));
+				}else{
+					//TODO: ERROR handling
+					$this->response->setOutput('error');
+					return false;
 				}
-			}
-		}
 
-		$data = array(
-			'debug' => json_encode($json),
-			'appId' => '123'
-		);
-		$this->response->setOutput(json_encode($json));
-		
+			}else{
+					//TODO: ERROR handling
+					$this->response->setOutput('error');
+					return false;
+			}
+			
+		}else{
+			//TODO: ERROR handling
+			$this->response->setOutput('error');
+			return false;
+		}
 	}
+
 
 	public function qrcode() {
 
@@ -200,36 +194,19 @@ class ControllerExtensionPaymentUePay extends Controller {
 			'text' => $this->language->get('text_qrcode'),
 			'href' => $this->url->link('extension/payment/ue_pay/qrcode')
 		);
+		$order_id = $this->session->data['order_id'];
 
-		$this->load->model('checkout/order');
-
-		$order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
-		$order_id = trim($order_info['order_id']);
-		$data['order_id'] = $order_id;
-		$subject = trim($this->config->get('config_name'));
-		$currency = $this->config->get('payment_ue_pay_currency');
-		$total_amount = trim($this->currency->format($order_info['total'], $currency, '', false));
-		$options = array(
-			'appid'			 =>  $this->config->get('payment_ue_pay_app_id'),
-			'appsecret'		 =>  $this->config->get('payment_ue_pay_app_secret'),
-			'mch_id'			=>  $this->config->get('payment_ue_pay_mch_id'),
-			'partnerkey'		=>  $this->config->get('payment_ue_pay_api_secret')
-		);
-
-		\Wechat\Loader::config($options);
-		$pay = new \Wechat\WechatPay();
-		
-		$data['code_url'] = "index.php?route=extension/payment/ue_pay/pay&order_id=" . $order_id; //TODO
-
+		$appid = $this->config->get('payment_ue_pay_app_id');
+		$callback = HTTP_SERVER . "index.php?route=extension/payment/ue_pay/pay&order_id=" . $order_id;
+		$weOAuth = new \Wechat\WechatOauth(array('appid'=>$appid));
+		$data['code_url'] =  $weOAuth->getOauthRedirect($callback, 'STATE');//TODO
 		$data['action_success'] = $this->url->link('checkout/success');
-
 		$data['column_left'] = $this->load->controller('common/column_left');
 		$data['column_right'] = $this->load->controller('common/column_right');
 		$data['content_top'] = $this->load->controller('common/content_top');
 		$data['content_bottom'] = $this->load->controller('common/content_bottom');
 		$data['footer'] = $this->load->controller('common/footer');
 		$data['header'] = $this->load->controller('common/header');
-
 		$this->response->setOutput($this->load->view('extension/payment/ue_pay_qrcode', $data));
 	}
 
