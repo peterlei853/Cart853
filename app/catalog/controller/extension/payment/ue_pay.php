@@ -133,24 +133,10 @@ class ControllerExtensionPaymentUePay extends Controller {
 		$this->response->setOutput($this->load->view('extension/payment/ue_pay_qrcode', $data));
 	}
 
-	public function isOrderPaid() {
-		$json = array();
-
-		$json['result'] = false;
-
-		if (isset($this->request->get['order_id'])) {
-			$order_id = $this->request->get['order_id'];
-
-			$this->load->model('checkout/order');
-			$order_info = $this->model_checkout_order->getOrder($order_id);
-
-			if ($order_info['order_status_id'] == $this->config->get('payment_ue_pay_completed_status_id')) {
-				$json['result'] = true;
-			}
-		}
-
-		$this->response->addHeader('Content-Type: application/json');
-		$this->response->setOutput(json_encode($json));
+	private function getUePayOrderId($order_id){
+		//$history_total = $this->model_sale_order->getTotalOrderHistories($order_id);
+		$seq = '001'; //TODO 001 get order history.
+		return $order_id . $seq; 
 	}
 
 	private function isUeOrderPaid($order_id){
@@ -226,9 +212,9 @@ class ControllerExtensionPaymentUePay extends Controller {
 		return $uePayResult;
 	}
 
-	private function ueQuery($orderNo){
+	private function ueQuery($order_id){
 		$arguments = array(
-			'orderNo' => $orderNo
+			'orderNo' => $this->getUePayOrderId($order_id)
 		);
 		$result = $this->uePost('QUERY', $arguments);
 		if ($result == false){
@@ -244,10 +230,10 @@ class ControllerExtensionPaymentUePay extends Controller {
 		$currency = $this->config->get('payment_ue_pay_currency');
 		$total_amount = trim($this->currency->format($order_info['total'], $currency, '', false));
 		
-		$order_id = 'T201812200' . $order_id; //FORTEST ONLY
+		$ue_order_id = $this->getUePayOrderId($order_id); //FORTEST ONLY
 
 		$arguments = array(
-			'orderNo' => '' . $order_id,
+			'orderNo' => '' . $ue_order_id,
 			'body' => '' . $order_id,
 			'amt' => strval($total_amount * 100),
 			"payMethod" => "wx",
@@ -304,6 +290,26 @@ class ControllerExtensionPaymentUePay extends Controller {
         }
         return false;
 	}
+
+	//public function isOrderPaid() {
+	//	$json = array();
+    //
+	//	$json['result'] = false;
+    //
+	//	if (isset($this->request->get['order_id'])) {
+	//		$order_id = $this->request->get['order_id'];
+    //
+	//		$this->load->model('checkout/order');
+	//		$order_info = $this->model_checkout_order->getOrder($order_id);
+    //
+	//		if ($order_info['order_status_id'] == $this->config->get('payment_ue_pay_completed_status_id')) {
+	//			$json['result'] = true;
+	//		}
+	//	}
+    //
+	//	$this->response->addHeader('Content-Type: application/json');
+	//	$this->response->setOutput(json_encode($json));
+	//}
 	//public function callback() {
 	//	//TODO, this is wechat not uepay
 	//	$options = array(
