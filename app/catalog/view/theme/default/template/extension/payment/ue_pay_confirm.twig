@@ -1,6 +1,36 @@
+{% if action_success %}
+<script type="text/javascript">
+    location.href = "{{ action_success }}";
+</script>
+{% endif %}
+
+{{ header }}
+<div id="common-success" class="container">
+  {% if error_warning %}
+    <div class="alert alert-danger alert-dismissible"><i class="fa fa-exclamation-circle"></i> {{ error_warning }}</div>
+  {% endif %}
+  <div class="row">{{ column_left }}
+    {% if column_left and column_right %}
+      {% set class = 'col-sm-6' %}
+    {% elseif column_left or column_right %}
+      {% set class = 'col-sm-9' %}
+    {% else %}
+      {% set class = 'col-sm-12' %}
+    {% endif %}
+    <div id="content" class="{{ class }}">{{ content_top }}
+      <h1>{{ heading_title }}</h1>
+      {% if message %}
+      <div class="text-center">
+        <div class="alert alert-info" style="width: 256px; margin: 5px auto;">{{ message }}</div>
+      </div>
+      {% endif %}
+      {{ content_bottom }}</div>
+    {{ column_right }}</div>
+</div>
+
+{% if ready %}
 <script type="text/javascript"><!--
   function onBridgeReady(){
-    alert('ready');
     WeixinJSBridge.invoke(
        'getBrandWCPayRequest', {
           "appId":"{{ appid }}",     //公众号名称，由商户传入     
@@ -11,12 +41,25 @@
           "paySign":"{{ paySign }}" //微信签名 
        },
        function(res){
-         alert(JSON.stringify(res));
-         if(res.err_msg == "get_brand_wcpay_request:ok" ){
-             alert('get_brand_wcpay_request:ok');
-             // 使用以上方式判断前端返回,微信团队郑重提示：
-             // res.err_msg将在用户支付成功后返回ok，但并不保证它绝对可靠。
-         } 
+
+         switch(res.err_msg) {
+             case 'get_brand_wcpay_request:cancel':
+                 alert('用户取消支付！');
+                 break;
+             case 'get_brand_wcpay_request:fail':
+                 alert('支付失敗！（'+res.err_desc+'）');
+                 break;
+             case 'get_brand_wcpay_request:ok':
+                 alert('支付成功！');
+                 {% if complete_url %}
+                   location.href = "{{ complete_url }}";
+                 {% endif %}
+                 break;
+             default:
+                 alert(JSON.stringify(res));
+                 break;
+         }
+
        }
     ); 
   }
@@ -32,8 +75,4 @@
   }
 //-->
 </script>
-<b>test page1:</b>
-<p>{{ debug }}</p>
-<b>result:</b>
-<p id="actionResult"></p>
-
+{% endif %}
