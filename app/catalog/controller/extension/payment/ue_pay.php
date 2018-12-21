@@ -122,6 +122,7 @@ class ControllerExtensionPaymentUePay extends Controller {
 		$weOAuth = new \Wechat\WechatOauth(array('appid'=>$appid));
 		$data['code_url'] =  $weOAuth->getOauthRedirect($callback, 'STATE');//TODO
 		$data['query_url'] =  HTTP_SERVER . "index.php?route=extension/payment/ue_pay/query&order_id=" . $order_id;
+		$data['order_id'] = $order_id;
 
 		$data['action_success'] = $this->url->link('checkout/success');
 		$data['column_left'] = $this->load->controller('common/column_left');
@@ -131,6 +132,26 @@ class ControllerExtensionPaymentUePay extends Controller {
 		$data['footer'] = $this->load->controller('common/footer');
 		$data['header'] = $this->load->controller('common/header');
 		$this->response->setOutput($this->load->view('extension/payment/ue_pay_qrcode', $data));
+	}
+
+	public function isOrderPaid() {
+		$json = array();
+    
+		$json['result'] = false;
+    
+		if (isset($this->request->get['order_id'])) {
+			$order_id = $this->request->get['order_id'];
+    
+			$this->load->model('checkout/order');
+			$order_info = $this->model_checkout_order->getOrder($order_id);
+    
+			if ($order_info['order_status_id'] == $this->config->get('payment_ue_pay_completed_status_id')) {
+				$json['result'] = true;
+			}
+		}
+    
+		$this->response->addHeader('Content-Type: application/json');
+		$this->response->setOutput(json_encode($json));
 	}
 
 	private function getUePayOrderId($order_id){
@@ -291,25 +312,6 @@ class ControllerExtensionPaymentUePay extends Controller {
         return false;
 	}
 
-	//public function isOrderPaid() {
-	//	$json = array();
-    //
-	//	$json['result'] = false;
-    //
-	//	if (isset($this->request->get['order_id'])) {
-	//		$order_id = $this->request->get['order_id'];
-    //
-	//		$this->load->model('checkout/order');
-	//		$order_info = $this->model_checkout_order->getOrder($order_id);
-    //
-	//		if ($order_info['order_status_id'] == $this->config->get('payment_ue_pay_completed_status_id')) {
-	//			$json['result'] = true;
-	//		}
-	//	}
-    //
-	//	$this->response->addHeader('Content-Type: application/json');
-	//	$this->response->setOutput(json_encode($json));
-	//}
 	//public function callback() {
 	//	//TODO, this is wechat not uepay
 	//	$options = array(
