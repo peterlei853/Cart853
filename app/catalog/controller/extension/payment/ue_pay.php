@@ -235,7 +235,7 @@ class ControllerExtensionPaymentUePay extends Controller {
 		$arguments = array(
 			'orderNo' => '' . $ue_order_id,
 			'body' => '' . $order_id,
-			'amt' => strval($total_amount * 100),
+			'amt' => strval((int)($total_amount * 100)),
 			"payMethod" => "wx",
 			'openid' => $open_id
 		);
